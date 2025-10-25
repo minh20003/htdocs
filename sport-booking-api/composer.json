@@ -1,0 +1,7 @@
+{
+    "require": {
+        "firebase/php-jwt": "^6.11",
+        "phpmailer/phpmailer": "^7.0",
+        "google/apiclient": "^2.18"
+    }
+}

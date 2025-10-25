@@ -1,0 +1,9 @@
+# Ignore Composer dependencies folder
+/vendor/
+
+# Ignore Google Cloud credentials file
+/config/firebase_credentials.json
+
+# Add any other files/folders you want to ignore below
+# Example: Ignore local environment file if you create one
+# /.env
