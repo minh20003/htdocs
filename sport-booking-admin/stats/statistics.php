@@ -1,24 +1,51 @@
 <?php
+// Start output buffering to prevent any output before headers
+ob_start();
 session_start();
-// Check if admin is logged in
+// Check login
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header("Location: ../auth/login.php");
     exit;
 }
-require_once '../config/database.php'; // Ensure path is correct
-// Set timezone for PHP date functions if needed (should match DB session)
+require_once '../config/database.php';
 date_default_timezone_set('Asia/Ho_Chi_Minh');
-$conn->query("SET time_zone = '+07:00'"); // Ensure DB session timezone is correct
+$conn->query("SET time_zone = '+07:00'");
 
-// --- Fetch Statistics ---
+// --- HANDLE TIME FILTERS ---
+$start_date = $_GET['start_date'] ?? null;
+$end_date = $_GET['end_date'] ?? null;
+
+// Build WHERE clause for date range (applies to COMPLETED bookings)
+$date_condition = "";
+$date_params = [];
+$date_types = "";
+if (!empty($start_date) && !empty($end_date)) {
+    $date_condition = "AND booking_date BETWEEN ? AND ?";
+    $date_params = [$start_date, $end_date];
+    $date_types = "ss";
+} elseif (!empty($start_date)) {
+    $date_condition = "AND booking_date >= ?";
+    $date_params = [$start_date];
+    $date_types = "s";
+} elseif (!empty($end_date)) {
+    $date_condition = "AND booking_date <= ?";
+    $date_params = [$end_date];
+    $date_types = "s";
+}
 
 // Calculate Total Revenue (Completed)
 $totalRevenue = 0;
-$revenueSql = "SELECT SUM(total_price) AS total FROM bookings WHERE status = 'completed'";
-$revenueResult = $conn->query($revenueSql);
-if ($revenueResult && $revenueResult->num_rows > 0) {
-    $row = $revenueResult->fetch_assoc();
-    $totalRevenue = $row['total'] ?? 0;
+$revenueSql = "SELECT SUM(total_price) AS total FROM bookings WHERE status = 'completed' {$date_condition}";
+$stmt_revenue = $conn->prepare($revenueSql);
+if ($stmt_revenue && !empty($date_params)) {
+    $stmt_revenue->bind_param($date_types, ...$date_params);
+}
+if ($stmt_revenue && $stmt_revenue->execute()) {
+    $revenueResult = $stmt_revenue->get_result();
+    if ($row = $revenueResult->fetch_assoc()) {
+        $totalRevenue = $row['total'] ?? 0;
+    }
+    $stmt_revenue->close();
 }
 
 // Count Total Bookings by Status
@@ -95,7 +122,7 @@ $topFieldsSql = "SELECT
                      b.field_id, sf.name
                  ORDER BY
                      booking_count DESC
-                 LIMIT 5"; // Get top 5 most booked fields
+                 LIMIT 5";
 
 $topFieldsResult = $conn->query($topFieldsSql);
 if ($topFieldsResult && $topFieldsResult->num_rows > 0) {
@@ -110,165 +137,377 @@ if ($topFieldsResult && $topFieldsResult->num_rows > 0) {
 $jsTopFieldsLabels = json_encode($topFieldsLabels);
 $jsTopFieldsData = json_encode($topFieldsData);
 
-$conn->close(); // Close connection after ALL queries
+$conn->close();
+
+$page_title = "Thống kê & Báo cáo";
+include '../includes/header.php';
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Thống kê & Báo cáo</title>
-    <style>
-        body { font-family: sans-serif; background-color: #f8f9fa; color: #333; }
-        .container { padding: 20px; max-width: 1100px; margin: 20px auto; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1, h2 { color: #0056b3; }
-        a { color: #007bff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        hr { border: 0; height: 1px; background-color: #eee; margin: 20px 0; }
-        .stats-container { display: flex; justify-content: space-around; flex-wrap: wrap; margin-bottom: 30px;}
-        .stat-box { border: 1px solid #ddd; padding: 20px; margin-bottom: 20px; border-radius: 5px; background-color: #f9f9f9; text-align: center; flex-basis: calc(33% - 20px); box-sizing: border-box; }
-        .stat-box h3 { margin-top: 0; color: #555; font-size: 1.1em;}
-        .stat-value { font-size: 26px; font-weight: bold; color: #0056b3; margin: 10px 0;}
-        .stat-box ul { list-style: none; padding: 0; margin: 10px 0 0 0; text-align: left; display: inline-block;}
-        .stat-box li { margin-bottom: 5px; }
-        .charts-row { display: flex; flex-wrap: wrap; justify-content: space-between; margin-top: 30px; }
-        .chart-container { position: relative; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff; margin-bottom: 20px; box-sizing: border-box;}
-        .chart-container canvas { max-width: 100%; }
-        .full-width-chart { width: 100%; height: 400px; }
-        .half-width-chart { width: calc(50% - 10px); height: 400px; }
 
-        @media (max-width: 992px) {
-            .half-width-chart { width: 100%; }
-        }
-        @media (max-width: 768px) {
-            .stat-box { flex-basis: calc(50% - 20px); }
-        }
-        @media (max-width: 480px) {
-            .stat-box { flex-basis: 100%; }
-        }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
-</head>
-<body>
-    <div class="container">
-        <h1>Thống kê & Báo cáo</h1>
-        <a href="../index.php">Quay lại Dashboard</a>
-        <hr>
+<style>
+    .filter-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
 
-        <div class="stats-container">
-            <div class="stat-box">
-                <h3>Tổng Doanh Thu (Hoàn thành)</h3>
-                <p class="stat-value"><?php echo number_format($totalRevenue, 0, ',', '.'); ?> đ</p>
-            </div>
-            <div class="stat-box">
-                <h3>Tổng Số Đơn Đặt</h3>
-                <ul>
-                    <li>Chờ xác nhận: <?php echo $bookingCounts['pending']; ?></li>
-                    <li>Đã xác nhận: <?php echo $bookingCounts['confirmed']; ?></li>
-                    <li>Đã hoàn thành: <?php echo $bookingCounts['completed']; ?></li>
-                    <li>Đã hủy: <?php echo $bookingCounts['cancelled']; ?></li>
-                </ul>
-            </div>
-            <div class="stat-box">
-                <h3>Tổng Số Người Dùng</h3>
-                <p class="stat-value"><?php echo $totalUsers; ?></p>
-            </div>
+    .filter-form {
+        display: flex;
+        gap: 1rem;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-group label {
+        font-weight: 600;
+        color: #475569;
+        font-size: 0.875rem;
+    }
+
+    .form-control {
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.625rem 1rem;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        outline: none;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    }
+
+    .stat-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .stat-card-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+
+    .stat-card-title {
+        font-size: 0.875rem;
+        color: #64748b;
+        font-weight: 500;
+        margin: 0;
+    }
+
+    .stat-card-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .stat-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .stat-list li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .stat-list li:last-child {
+        border-bottom: none;
+    }
+
+    .chart-container {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+    }
+
+    .chart-container h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 1rem;
+    }
+
+    .chart-wrapper {
+        position: relative;
+        height: 400px;
+    }
+
+    .full-width {
+        grid-column: 1 / -1;
+    }
+
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title mb-0">
+        <i class="bi bi-graph-up"></i>
+        <span>Thống kê & Báo cáo</span>
+    </h1>
+</div>
+
+<div class="filter-card">
+    <form method="get" action="statistics.php" class="filter-form">
+        <div class="form-group">
+            <label for="start_date">Từ ngày:</label>
+            <input type="date" id="start_date" name="start_date" class="form-control" value="<?php echo htmlspecialchars($_GET['start_date'] ?? ''); ?>">
         </div>
+        <div class="form-group">
+            <label for="end_date">Đến ngày:</label>
+            <input type="date" id="end_date" name="end_date" class="form-control" value="<?php echo htmlspecialchars($_GET['end_date'] ?? ''); ?>">
+        </div>
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-funnel me-2"></i>Lọc
+            </button>
+        </div>
+        <div class="form-group">
+            <a href="statistics.php" class="btn btn-secondary" style="background: #64748b; color: white; text-decoration: none; padding: 0.625rem 1.5rem; border-radius: 10px;">
+                <i class="bi bi-arrow-counterclockwise me-2"></i>Xem tất cả
+            </a>
+        </div>
+    </form>
+</div>
 
-        <hr>
-
-        <div class="charts-row">
-            <div class="chart-container full-width-chart">
-                 <h2>Doanh thu Theo Tháng (12 tháng gần nhất)</h2>
-                 <canvas id="revenueChart"></canvas>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-header">
+            <div>
+                <p class="stat-card-title">Tổng Doanh Thu</p>
+                <h3 class="stat-card-value"><?php echo number_format($totalRevenue, 0, ',', '.'); ?> đ</h3>
             </div>
-            <div class="chart-container half-width-chart">
-                 <h2>Tỷ lệ Trạng thái Đơn Đặt</h2>
-                 <canvas id="statusPieChart"></canvas>
-            </div>
-            <div class="chart-container half-width-chart">
-                 <h2>Sân được đặt nhiều nhất (Top 5)</h2>
-                 <canvas id="topFieldsChart"></canvas>
+            <div class="stat-card-icon icon-success">
+                <i class="bi bi-currency-dollar"></i>
             </div>
         </div>
     </div>
 
-    <script>
-        // --- Bar Chart for Monthly Revenue ---
-        const ctxBar = document.getElementById('revenueChart').getContext('2d');
-        const revenueChart = new Chart(ctxBar, {
-            type: 'bar',
-            data: {
-                labels: <?php echo $jsMonthlyLabels; ?>,
-                datasets: [{
-                    label: 'Doanh thu (VNĐ)',
-                    data: <?php echo $jsMonthlyData; ?>,
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                if (typeof value === 'number') { return value.toLocaleString('vi-VN') + ' đ'; }
-                                return value;
+    <div class="stat-card">
+        <div class="stat-card-header">
+            <div>
+                <p class="stat-card-title">Tổng Số Đơn Đặt</p>
+                <h3 class="stat-card-value"><?php echo array_sum($bookingCounts); ?></h3>
+            </div>
+            <div class="stat-card-icon icon-primary">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+        </div>
+        <ul class="stat-list">
+            <li><span>Chờ xác nhận:</span> <strong><?php echo $bookingCounts['pending']; ?></strong></li>
+            <li><span>Đã xác nhận:</span> <strong><?php echo $bookingCounts['confirmed']; ?></strong></li>
+            <li><span>Đã hoàn thành:</span> <strong><?php echo $bookingCounts['completed']; ?></strong></li>
+            <li><span>Đã hủy:</span> <strong><?php echo $bookingCounts['cancelled']; ?></strong></li>
+        </ul>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-header">
+            <div>
+                <p class="stat-card-title">Tổng Số Người Dùng</p>
+                <h3 class="stat-card-value"><?php echo $totalUsers; ?></h3>
+            </div>
+            <div class="stat-card-icon icon-info">
+                <i class="bi bi-people"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-container full-width">
+        <h3>Doanh thu Theo Tháng (12 tháng gần nhất)</h3>
+        <div class="chart-wrapper">
+            <canvas id="revenueChart"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h3>Tỷ lệ Trạng thái Đơn Đặt</h3>
+        <div class="chart-wrapper">
+            <canvas id="statusPieChart"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h3>Sân được đặt nhiều nhất (Top 5)</h3>
+        <div class="chart-wrapper">
+            <canvas id="topFieldsChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+    // Bar Chart for Monthly Revenue
+    const ctxBar = document.getElementById('revenueChart').getContext('2d');
+    const revenueChart = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: <?php echo $jsMonthlyLabels; ?>,
+            datasets: [{
+                label: 'Doanh thu (VNĐ)',
+                data: <?php echo $jsMonthlyData; ?>,
+                backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                borderColor: 'rgba(99, 102, 241, 1)',
+                borderWidth: 2,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            if (typeof value === 'number') {
+                                return value.toLocaleString('vi-VN') + ' đ';
                             }
+                            return value;
                         }
                     }
-                },
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false }, title: { display: false } }
-            }
-        });
-
-        // --- Pie Chart for Booking Status ---
-        const ctxPie = document.getElementById('statusPieChart').getContext('2d');
-        const statusPieChart = new Chart(ctxPie, {
-            type: 'pie',
-            data: {
-                labels: <?php echo $jsStatusLabels; ?>,
-                datasets: [{
-                    label: 'Số lượng đơn',
-                    data: <?php echo $jsStatusData; ?>,
-                    backgroundColor: [
-                        'rgba(255, 159, 64, 0.7)', // Orange
-                        'rgba(75, 192, 192, 0.7)', // Teal
-                        'rgba(54, 162, 235, 0.7)', // Blue
-                        'rgba(255, 99, 132, 0.7)'  // Red
-                    ],
-                    borderColor: [ /* Colors */ ], borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'top' }, title: { display: false } }
-            }
-        });
-
-         // --- Bar Chart for Top Fields ---
-         const ctxTopFields = document.getElementById('topFieldsChart').getContext('2d');
-            const topFieldsChart = new Chart(ctxTopFields, {
-                type: 'bar',
-                data: {
-                    labels: <?php echo $jsTopFieldsLabels; ?>,
-                    datasets: [{
-                        label: 'Số lượt đặt',
-                        data: <?php echo $jsTopFieldsData; ?>,
-                        backgroundColor: 'rgba(153, 102, 255, 0.6)', // Purple
-                        borderColor: 'rgba(153, 102, 255, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    indexAxis: 'y', // Horizontal bars
-                    scales: { x: { beginAtZero: true } },
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false }, title: { display: false } }
                 }
-            });
-    </script>
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
 
-</body>
-</html>
+    // Pie Chart for Booking Status
+    const ctxPie = document.getElementById('statusPieChart').getContext('2d');
+    const statusLabelsTranslated = {
+        'pending': 'Chờ xác nhận',
+        'confirmed': 'Đã xác nhận',
+        'completed': 'Hoàn thành',
+        'cancelled': 'Đã hủy'
+    };
+    const originalLabels = <?php echo $jsStatusLabels; ?>;
+    const translatedLabels = originalLabels.map(label => statusLabelsTranslated[label] || label);
+    
+    const statusPieChart = new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+            labels: translatedLabels,
+            datasets: [{
+                label: 'Số lượng đơn',
+                data: <?php echo $jsStatusData; ?>,
+                backgroundColor: [
+                    'rgba(245, 158, 11, 0.7)',
+                    'rgba(59, 130, 246, 0.7)',
+                    'rgba(16, 185, 129, 0.7)',
+                    'rgba(239, 68, 68, 0.7)'
+                ],
+                borderColor: [
+                    'rgba(245, 158, 11, 1)',
+                    'rgba(59, 130, 246, 1)',
+                    'rgba(16, 185, 129, 1)',
+                    'rgba(239, 68, 68, 1)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+
+    // Bar Chart for Top Fields
+    const ctxTopFields = document.getElementById('topFieldsChart').getContext('2d');
+    const topFieldsChart = new Chart(ctxTopFields, {
+        type: 'bar',
+        data: {
+            labels: <?php echo $jsTopFieldsLabels; ?>,
+            datasets: [{
+                label: 'Số lượt đặt',
+                data: <?php echo $jsTopFieldsData; ?>,
+                backgroundColor: 'rgba(139, 92, 246, 0.6)',
+                borderColor: 'rgba(139, 92, 246, 1)',
+                borderWidth: 2,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            scales: {
+                x: { beginAtZero: true }
+            },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+</script>
+
+<?php include '../includes/footer.php'; ?>
