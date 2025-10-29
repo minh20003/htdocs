@@ -346,9 +346,15 @@ if (session_status() === PHP_SESSION_NONE) {
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo (strpos($_SERVER['REQUEST_URI'], '/fields/') !== false) ? 'active' : ''; ?>" href="<?php echo $base_url; ?>fields/manage_fields.php">
+                        <a class="nav-link <?php echo (strpos($_SERVER['REQUEST_URI'], '/fields/') !== false && strpos($_SERVER['REQUEST_URI'], 'pricing') === false) ? 'active' : ''; ?>" href="<?php echo $base_url; ?>fields/manage_fields.php">
                             <i class="bi bi-geo-alt"></i>
                             <span>Quản lý Sân</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?php echo (strpos($_SERVER['REQUEST_URI'], 'pricing') !== false) ? 'active' : ''; ?>" href="<?php echo $base_url; ?>fields/manage_pricing.php">
+                            <i class="bi bi-cash-stack"></i>
+                            <span>Quản lý Giá</span>
                         </a>
                     </li>
                     <li class="nav-item">

@@ -23,7 +23,12 @@ if (empty($booking_id) || !is_numeric($booking_id) || empty($new_status) || !in_
 
 // Prepare SQL statement to update the status
 // Allow update if status is 'pending' (to confirm/cancel) OR 'confirmed' (to complete/cancel)
-$stmt = $conn->prepare("UPDATE bookings SET status = ? WHERE id = ? AND (status = 'pending' OR status = 'confirmed')");
+// If status is 'completed', also update payment_status to 'paid'
+if ($new_status == 'completed') {
+    $stmt = $conn->prepare("UPDATE bookings SET status = ?, payment_status = 'paid' WHERE id = ? AND (status = 'pending' OR status = 'confirmed')");
+} else {
+    $stmt = $conn->prepare("UPDATE bookings SET status = ? WHERE id = ? AND (status = 'pending' OR status = 'confirmed')");
+}
 
 if (!$stmt) {
     // Handle prepare error
@@ -40,7 +45,11 @@ $stmt->bind_param("si", $new_status, $booking_id);
 if ($stmt->execute()) {
     // Check if any row was actually updated (prevents updating already completed/cancelled bookings with the same status)
     if ($stmt->affected_rows > 0) {
-        $_SESSION['manage_booking_success'] = "Cập nhật trạng thái đơn đặt #" . htmlspecialchars($booking_id) . " thành '" . htmlspecialchars($new_status) . "' thành công!";
+        $success_msg = "Cập nhật trạng thái đơn đặt #" . htmlspecialchars($booking_id) . " thành '" . htmlspecialchars($new_status) . "' thành công!";
+        if ($new_status == 'completed') {
+            $success_msg .= " Trạng thái thanh toán đã được cập nhật thành 'Đã thanh toán'.";
+        }
+        $_SESSION['manage_booking_success'] = $success_msg;
 
         // TODO: (Optional but Recommended) Send notification to user about status change
         // You would need to:

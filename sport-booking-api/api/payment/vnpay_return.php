@@ -53,9 +53,25 @@ $secureHash = hash_hmac('sha512', $hashData, $vnp_HashSecret);
                 $stmt->bind_param("si", $vnp_TransactionNo, $booking_id);
                 $stmt->execute();
                 
+                // Lấy thông tin booking để hiển thị
+                $query_booking = "SELECT b.*, sf.name as field_name FROM bookings b 
+                                  JOIN sport_fields sf ON b.field_id = sf.id 
+                                  WHERE b.id = ?";
+                $stmt_booking = $conn->prepare($query_booking);
+                $stmt_booking->bind_param("i", $booking_id);
+                $stmt_booking->execute();
+                $result_booking = $stmt_booking->get_result();
+                $booking_data = $result_booking->fetch_assoc();
+                
                 echo "<h2 class='success'>Thanh toán thành công!</h2>";
                 echo "<p>Cảm ơn bạn đã sử dụng dịch vụ.</p>";
                 echo "<p>Mã đơn hàng: " . htmlspecialchars($booking_id) . "</p>";
+                
+                if ($booking_data) {
+                    echo "<p>Sân: " . htmlspecialchars($booking_data['field_name']) . "</p>";
+                    echo "<p>Ngày: " . htmlspecialchars($booking_data['booking_date']) . "</p>";
+                    echo "<p>Giờ: " . htmlspecialchars(substr($booking_data['time_slot_start'], 0, 5)) . " - " . htmlspecialchars(substr($booking_data['time_slot_end'], 0, 5)) . "</p>";
+                }
 
             } else {
                 // Giao dịch thất bại

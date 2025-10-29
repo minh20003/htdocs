@@ -286,6 +286,12 @@ if (isset($_SESSION['manage_booking_error'])) {
                                        onclick="return confirm('Từ chối đơn đặt này?');">
                                         <i class="bi bi-x-circle"></i> Từ chối
                                     </a>
+                                <?php elseif ($booking['booking_status'] == 'confirmed'): ?>
+                                    <a href="update_booking_status.php?id=<?php echo $booking['booking_id']; ?>&status=completed" 
+                                       class="btn-sm btn-confirm"
+                                       onclick="return confirm('Đánh dấu đơn này là đã hoàn thành?');">
+                                        <i class="bi bi-check-all"></i> Hoàn thành
+                                    </a>
                                 <?php endif; ?>
                                 <a href="view_booking.php?id=<?php echo $booking['booking_id']; ?>" class="btn-sm btn-view">
                                     <i class="bi bi-eye"></i> Xem

@@ -306,7 +306,10 @@ include '../includes/header.php';
     <div class="detail-item">
         <span class="detail-label">Trạng thái Đơn:</span>
         <span class="detail-value">
-            <span class="badge-status status-<?php echo $booking['booking_status']; ?>">
+            <?php
+            $bookingStatus = $booking['status'] ?? $booking['booking_status'] ?? 'pending';
+            ?>
+            <span class="badge-status status-<?php echo $bookingStatus; ?>">
                 <?php
                 $statusMap = [
                     'pending' => 'Chờ xác nhận',
@@ -314,7 +317,7 @@ include '../includes/header.php';
                     'completed' => 'Hoàn thành',
                     'cancelled' => 'Đã hủy'
                 ];
-                echo $statusMap[$booking['booking_status']] ?? ucfirst($booking['booking_status']);
+                echo $statusMap[$bookingStatus] ?? ucfirst($bookingStatus);
                 ?>
             </span>
         </span>
@@ -328,7 +331,9 @@ include '../includes/header.php';
 <div class="detail-card">
     <h3><i class="bi bi-gear me-2"></i>Hành động</h3>
     <div class="action-buttons">
-        <?php if ($booking['booking_status'] == 'pending'): ?>
+        <?php 
+        $currentStatus = $booking['status'] ?? $booking['booking_status'] ?? 'pending';
+        if ($currentStatus == 'pending'): ?>
             <a href="update_booking_status.php?id=<?php echo $booking['id']; ?>&status=confirmed" 
                class="btn-sm btn-confirm"
                onclick="return confirm('Xác nhận đơn đặt này?');">
@@ -339,7 +344,7 @@ include '../includes/header.php';
                onclick="return confirm('Từ chối đơn đặt này?');">
                 <i class="bi bi-x-circle"></i> Từ chối
             </a>
-        <?php elseif ($booking['booking_status'] == 'confirmed'): ?>
+        <?php elseif ($currentStatus == 'confirmed'): ?>
             <a href="update_booking_status.php?id=<?php echo $booking['id']; ?>&status=completed" 
                class="btn-sm btn-complete"
                onclick="return confirm('Đánh dấu đơn này là đã hoàn thành?');">
