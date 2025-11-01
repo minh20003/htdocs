@@ -24,7 +24,7 @@ use Google\Service\FirebaseCloudMessaging\Message;
 use Google\Service\FirebaseCloudMessaging\Notification;
 
 // --- Hàm gửi thông báo FCM (phiên bản V1) ---
-function sendFCMNotificationV1($targetToken, $title, $body) {
+function sendFCMNotificationV1($targetToken, $title, $body, $post_id) {
     try {
         // Đường dẫn đến file JSON key
         $serviceAccountKeyFile = __DIR__ . '/../../config/firebase_credentials.json';
@@ -52,9 +52,9 @@ function sendFCMNotificationV1($targetToken, $title, $body) {
         $message->setToken($targetToken);
         $message->setNotification($notification);
         $message->setData([
-    'notification_type' => 'teammate_join',
-    'post_id' => (string)$post_id // Gửi ID tin đăng dạng chuỗi
-]);
+            'notification_type' => 'teammate_join',
+            'post_id' => (string)$post_id // Gửi ID tin đăng dạng chuỗi
+        ]);
 
         // Tạo Request
         $request = new SendMessageRequest();
@@ -175,7 +175,7 @@ if ($jwt) {
                 if (!empty($owner_fcm_token)) {
                     $title = "Có người mới tham gia!";
                     $body = $joiner_name . " vừa tham gia vào tin tìm người chơi của bạn.";
-                    sendFCMNotificationV1($owner_fcm_token, $title, $body);
+                    sendFCMNotificationV1($owner_fcm_token, $title, $body, $post_id);
                 } else {
                      error_log("FCM V1: Could not send notification for post_id $post_id, owner_id $post_owner_id - No FCM token.");
                 }

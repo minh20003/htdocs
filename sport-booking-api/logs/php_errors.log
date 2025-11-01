@@ -1,0 +1,17 @@
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Script started
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Database config loaded
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Database connected successfully
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Raw input length: 63
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Data from POST
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Received - Email: dinh48967@gmail.com, OTP: 547443
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Input validation passed
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Preparing OTP check query
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Executing OTP check query
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] OTP check result: 1 row(s)
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Valid OTP for user ID: 2 (nguyen van a)
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Password hashed successfully
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Preparing password update query
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Executing password update
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Password updated successfully. Affected rows: 1
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Database connection closed
+[30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Sending success response
