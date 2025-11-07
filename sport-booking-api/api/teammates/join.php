@@ -2,7 +2,6 @@
 // Bật ghi log lỗi (quan trọng để debug)
 ini_set('display_errors', 0); // Tắt hiển thị lỗi ra output (an toàn hơn)
 ini_set('log_errors', 1);
-// Đặt đường dẫn file log nếu cần: ini_set('error_log', '/path/to/your/php-error.log');
 error_reporting(E_ALL);
 
 // Headers
@@ -76,10 +75,10 @@ function sendFCMNotificationV1($targetToken, $title, $body, $post_id) {
         error_log("FCM V1 Success: Message sent to token starting with " . substr($targetToken, 0, 10) . ". Response name: " . ($response->name ?? 'N/A'));
         return true;
 
-    } catch (\Google\Exception $e) { // Bắt lỗi cụ thể của Google API Client
+    } catch (\Google\Exception $e) {
         error_log("FCM V1 Google API Exception: " . $e->getMessage() . " Code: " . $e->getCode() . " Errors: " . json_encode($e->getErrors()));
         return false;
-    } catch (\Exception $e) { // Bắt các lỗi chung khác
+    } catch (\Exception $e) {
         error_log("FCM V1 General Exception: " . $e->getMessage());
         return false;
     }
@@ -97,53 +96,72 @@ if ($authHeader && preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
 
 // Kiểm tra kết nối database
 if ($conn->connect_error) {
-    http_response_code(500); error_log("DB Connection failed: " . $conn->connect_error); echo json_encode(["message" => "Lỗi kết nối database"]); exit();
+    http_response_code(500);
+    error_log("DB Connection failed: " . $conn->connect_error);
+    echo json_encode(["message" => "Lỗi kết nối database"]);
+    exit();
 }
+
 // Đồng bộ múi giờ (nếu cần)
 $conn->query("SET time_zone = '+07:00'");
 
 // Nếu có token JWT
 if ($jwt) {
-    $conn->begin_transaction(); // Bắt đầu transaction để đảm bảo tính nhất quán
+    $conn->begin_transaction(); // Bắt đầu transaction
     try {
         $decoded = JWT::decode($jwt, new Key($secret_key, 'HS256'));
         $joiner_id = $decoded->data->id;
-        $joiner_name = $decoded->data->full_name ?? 'Một người dùng'; // Lấy tên từ token
+        $joiner_name = $decoded->data->full_name ?? 'Một người dùng';
 
         $data = json_decode(file_get_contents("php://input"));
 
-        // Kiểm tra post_id có được gửi không
+        // Kiểm tra post_id
         if (!empty($data->post_id) && is_numeric($data->post_id)) {
             $post_id = $data->post_id;
 
-            // 1. Kiểm tra xem tin đăng có tồn tại và người đăng có phải người tham gia không
+            // 1. Kiểm tra tin đăng tồn tại
             $post_owner_id = null;
             $post_owner_query = "SELECT user_id FROM find_teammates WHERE id = ? LIMIT 1";
             $post_stmt = $conn->prepare($post_owner_query);
             if (!$post_stmt) throw new Exception("Prepare failed (check owner): " . $conn->error);
+            
             $post_stmt->bind_param("i", $post_id);
             if (!$post_stmt->execute()) throw new Exception("Execute failed (check owner): " . $post_stmt->error);
+            
             $post_result = $post_stmt->get_result();
             if ($post_result->num_rows === 0) {
-                 $conn->rollback(); http_response_code(404); echo json_encode(["message" => "Tin đăng không tồn tại."]); exit();
+                $conn->rollback();
+                http_response_code(404);
+                echo json_encode(["message" => "Tin đăng không tồn tại."]);
+                exit();
             }
+            
             $post_row = $post_result->fetch_assoc();
             $post_owner_id = $post_row['user_id'];
             $post_stmt->close();
 
+            // Không thể tham gia tin của chính mình
             if ($post_owner_id == $joiner_id) {
-                $conn->rollback(); http_response_code(400); echo json_encode(["message" => "Bạn không thể tham gia tin của chính mình."]); exit();
+                $conn->rollback();
+                http_response_code(400);
+                echo json_encode(["message" => "Bạn không thể tham gia tin của chính mình."]);
+                exit();
             }
 
-            // 2. Kiểm tra xem người dùng đã tham gia chưa
+            // 2. Kiểm tra đã tham gia chưa
             $check_query = "SELECT id FROM find_teammates_participants WHERE post_id = ? AND user_id = ? LIMIT 1";
             $check_stmt = $conn->prepare($check_query);
-             if (!$check_stmt) throw new Exception("Prepare failed (check participant): " . $conn->error);
+            if (!$check_stmt) throw new Exception("Prepare failed (check participant): " . $conn->error);
+            
             $check_stmt->bind_param("ii", $post_id, $joiner_id);
             if (!$check_stmt->execute()) throw new Exception("Execute failed (check participant): " . $check_stmt->error);
+            
             $check_result = $check_stmt->get_result();
             if ($check_result->num_rows > 0) {
-                $conn->rollback(); http_response_code(409); echo json_encode(["message" => "Bạn đã tham gia tin này rồi."]); exit();
+                $conn->rollback();
+                http_response_code(409);
+                echo json_encode(["message" => "Bạn đã tham gia tin này rồi."]);
+                exit();
             }
             $check_stmt->close();
 
@@ -151,65 +169,106 @@ if ($jwt) {
             $insert_query = "INSERT INTO find_teammates_participants (post_id, user_id) VALUES (?, ?)";
             $insert_stmt = $conn->prepare($insert_query);
             if (!$insert_stmt) throw new Exception("Prepare failed (insert participant): " . $conn->error);
+            
             $insert_stmt->bind_param("ii", $post_id, $joiner_id);
 
             if ($insert_stmt->execute()) {
-                // Gửi thông báo sau khi thêm thành công
+                // ============================================
+                // MỚI: LƯU NOTIFICATION VÀO DATABASE
+                // ============================================
+                $notif_title = "Có người mới tham gia! 🎉";
+                $notif_message = $joiner_name . " vừa tham gia vào tin tìm người chơi của bạn.";
+                $notif_data = json_encode([
+                    'post_id' => $post_id,
+                    'joiner_id' => $joiner_id,
+                    'joiner_name' => $joiner_name
+                ]);
+
+                $notif_query = "INSERT INTO notifications (user_id, type, title, message, data) 
+                               VALUES (?, 'teammate_join', ?, ?, ?)";
+                $notif_stmt = $conn->prepare($notif_query);
+                
+                if ($notif_stmt) {
+                    $notif_stmt->bind_param("isss", $post_owner_id, $notif_title, $notif_message, $notif_data);
+                    if ($notif_stmt->execute()) {
+                        error_log("Notification saved to database for user_id: $post_owner_id");
+                    } else {
+                        error_log("Failed to save notification: " . $notif_stmt->error);
+                    }
+                    $notif_stmt->close();
+                } else {
+                    error_log("Failed to prepare notification statement: " . $conn->error);
+                }
+
+                // ============================================
+                // GỬI FCM PUSH NOTIFICATION
+                // ============================================
                 $owner_fcm_token = null;
                 $get_owner_query = "SELECT fcm_token FROM users WHERE id = ?";
                 $owner_stmt = $conn->prepare($get_owner_query);
-                 if (!$owner_stmt) {
-                     error_log("Prepare failed (get owner token): (" . $conn->errno . ") " . $conn->error);
-                 } else {
-                     $owner_stmt->bind_param("i", $post_owner_id); // Dùng $post_owner_id đã lấy ở trên
-                     if ($owner_stmt->execute()) {
-                         $owner_result = $owner_stmt->get_result();
-                         if ($owner_result->num_rows > 0) {
-                             $owner_row = $owner_result->fetch_assoc();
-                             $owner_fcm_token = $owner_row['fcm_token'];
-                         }
-                     } else { error_log("Execute failed (get owner token): " . $owner_stmt->error); }
-                     $owner_stmt->close();
-                 }
-
-                if (!empty($owner_fcm_token)) {
-                    $title = "Có người mới tham gia!";
-                    $body = $joiner_name . " vừa tham gia vào tin tìm người chơi của bạn.";
-                    sendFCMNotificationV1($owner_fcm_token, $title, $body, $post_id);
+                
+                if ($owner_stmt) {
+                    $owner_stmt->bind_param("i", $post_owner_id);
+                    if ($owner_stmt->execute()) {
+                        $owner_result = $owner_stmt->get_result();
+                        if ($owner_result->num_rows > 0) {
+                            $owner_row = $owner_result->fetch_assoc();
+                            $owner_fcm_token = $owner_row['fcm_token'];
+                        }
+                    } else {
+                        error_log("Execute failed (get owner token): " . $owner_stmt->error);
+                    }
+                    $owner_stmt->close();
                 } else {
-                     error_log("FCM V1: Could not send notification for post_id $post_id, owner_id $post_owner_id - No FCM token.");
+                    error_log("Prepare failed (get owner token): " . $conn->error);
+                }
+
+                // Gửi FCM nếu có token
+                if (!empty($owner_fcm_token)) {
+                    $fcm_title = "Có người mới tham gia!";
+                    $fcm_body = $joiner_name . " vừa tham gia vào tin tìm người chơi của bạn.";
+                    sendFCMNotificationV1($owner_fcm_token, $fcm_title, $fcm_body, $post_id);
+                } else {
+                    error_log("FCM V1: Could not send notification for post_id $post_id, owner_id $post_owner_id - No FCM token.");
                 }
 
                 $conn->commit(); // Hoàn tất transaction thành công
                 http_response_code(200);
-                echo json_encode(["message" => "Tham gia thành công."]);
+                echo json_encode([
+                    "message" => "Tham gia thành công.",
+                    "success" => true
+                ]);
 
             } else {
-                // Lỗi khi thêm người tham gia
-                 throw new Exception("Execute failed (insert participant): " . $insert_stmt->error);
+                throw new Exception("Execute failed (insert participant): " . $insert_stmt->error);
             }
             $insert_stmt->close();
 
         } else {
-            // Dữ liệu post_id không hợp lệ
-            $conn->rollback(); http_response_code(400); echo json_encode(["message" => "Dữ liệu không đầy đủ hoặc không hợp lệ (thiếu post_id)."]);
+            $conn->rollback();
+            http_response_code(400);
+            echo json_encode(["message" => "Dữ liệu không đầy đủ hoặc không hợp lệ (thiếu post_id)."]);
         }
-    // Bắt các lỗi JWT
+        
     } catch (\Firebase\JWT\ExpiredException $e) {
-        $conn->rollback(); http_response_code(401); echo json_encode(["message" => "Token đã hết hạn."]);
+        $conn->rollback();
+        http_response_code(401);
+        echo json_encode(["message" => "Token đã hết hạn."]);
     } catch (\Firebase\JWT\SignatureInvalidException $e) {
-        $conn->rollback(); http_response_code(401); echo json_encode(["message" => "Token không hợp lệ."]);
-    } catch (Exception $e) { // Bắt các lỗi khác (SQL, logic,...)
-        $conn->rollback(); // Hoàn tác các thay đổi nếu có lỗi
+        $conn->rollback();
+        http_response_code(401);
+        echo json_encode(["message" => "Token không hợp lệ."]);
+    } catch (Exception $e) {
+        $conn->rollback();
         error_log("Error in join.php: " . $e->getMessage());
-        http_response_code(500); echo json_encode(["message" => "Có lỗi xảy ra, vui lòng thử lại."]);
+        http_response_code(500);
+        echo json_encode(["message" => "Có lỗi xảy ra, vui lòng thử lại."]);
     } finally {
-         // Luôn đóng kết nối DB
-         $conn->close();
+        $conn->close();
     }
 } else {
-    // Không có token JWT
-    http_response_code(401); echo json_encode(["message" => "Yêu cầu xác thực."]);
-    $conn->close(); // Đóng kết nối
+    http_response_code(401);
+    echo json_encode(["message" => "Yêu cầu xác thực."]);
+    $conn->close();
 }
 ?>

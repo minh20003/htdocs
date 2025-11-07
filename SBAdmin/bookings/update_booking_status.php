@@ -43,13 +43,55 @@ $stmt->bind_param("si", $new_status, $booking_id);
 
 // Execute the statement
 if ($stmt->execute()) {
-    // Check if any row was actually updated (prevents updating already completed/cancelled bookings with the same status)
     if ($stmt->affected_rows > 0) {
-        $success_msg = "Cập nhật trạng thái đơn đặt #" . htmlspecialchars($booking_id) . " thành '" . htmlspecialchars($new_status) . "' thành công!";
-        if ($new_status == 'completed') {
-            $success_msg .= " Trạng thái thanh toán đã được cập nhật thành 'Đã thanh toán'.";
+        $_SESSION['manage_booking_success'] = "Cập nhật thành công!";
+        
+        // GỬI NOTIFICATION CHO USER
+        require_once '../config/database.php';
+        
+        // Lấy thông tin user từ booking
+        $get_user_query = "SELECT b.user_id, u.fcm_token, u.full_name 
+                          FROM bookings b 
+                          LEFT JOIN users u ON b.user_id = u.id 
+                          WHERE b.id = ?";
+        $get_user_stmt = $conn->prepare($get_user_query);
+        $get_user_stmt->bind_param("i", $booking_id);
+        $get_user_stmt->execute();
+        $user_result = $get_user_stmt->get_result();
+        
+        if ($user_result->num_rows > 0) {
+            $user_row = $user_result->fetch_assoc();
+            $user_id = $user_row['user_id'];
+            $fcm_token = $user_row['fcm_token'];
+            
+            // Xác định title và message dựa vào status
+            if ($new_status == 'confirmed') {
+                $notif_title = "Đơn đặt sân đã được xác nhận!";
+                $notif_message = "Đơn đặt #$booking_id của bạn đã được xác nhận. Hãy đến sân đúng giờ nhé!";
+            } elseif ($new_status == 'cancelled') {
+                $notif_title = "Đơn đặt sân đã bị hủy";
+                $notif_message = "Đơn đặt #$booking_id của bạn đã bị hủy. Vui lòng liên hệ để biết thêm chi tiết.";
+            } elseif ($new_status == 'completed') {
+                $notif_title = "Đơn đặt sân hoàn thành";
+                $notif_message = "Cảm ơn bạn đã sử dụng dịch vụ! Hãy đánh giá sân để giúp chúng tôi cải thiện.";
+            }
+            
+            // Lưu vào database
+            $notif_query = "INSERT INTO notifications (user_id, type, title, message, data) 
+                           VALUES (?, 'booking', ?, ?, ?)";
+            $notif_stmt = $conn->prepare($notif_query);
+            $notif_data = json_encode(['booking_id' => $booking_id]);
+            $notif_stmt->bind_param("isss", $user_id, $notif_title, $notif_message, $notif_data);
+            $notif_stmt->execute();
+            $notif_stmt->close();
+            
+            // Gửi FCM nếu có token
+            if (!empty($fcm_token)) {
+                // Include hàm sendFCMNotificationV1 từ join.php hoặc tạo file riêng
+                // sendFCMNotificationV1($fcm_token, $notif_title, $notif_message, $booking_id);
+            }
         }
-        $_SESSION['manage_booking_success'] = $success_msg;
+        $get_user_stmt->close();
 
         // TODO: (Optional but Recommended) Send notification to user about status change
         // You would need to:

@@ -1,4 +1,7 @@
 <?php
+// Set timezone để tránh lỗi clock skew
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 // Headers
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
@@ -60,6 +63,10 @@ $client = new GoogleClient(['client_id' => $google_client_id]);
 
 try {
     error_log("Starting Google ID Token verification...");
+    
+    // Thêm leeway để xử lý clock skew (chênh lệch thời gian)
+    // JWT library có thể từ chối token nếu thời gian server khác với thời gian issue token
+    \Firebase\JWT\JWT::$leeway = 60; // 60 giây leeway
     
     $payload = $client->verifyIdToken($id_token);
     
