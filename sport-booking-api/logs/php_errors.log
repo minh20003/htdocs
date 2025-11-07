@@ -15,3 +15,60 @@
 [30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Password updated successfully. Affected rows: 1
 [30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Database connection closed
 [30-Oct-2025 15:25:55 Europe/Berlin] [RESET_PASSWORD] Sending success response
+[03-Nov-2025 13:00:14 Europe/Berlin] Login request body: {
+  "email": "dinh48967@gmail.com",
+  "password": "minhteo2003"
+}
+
+[03-Nov-2025 13:00:14 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:00:14 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 13:02:38 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:02:38 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:02:38 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 13:13:00 Europe/Berlin] Login request body: {"email":"dquangminh79@gmail.com","id":0,"password":"minheo2003"}
+[03-Nov-2025 13:13:00 Europe/Berlin] Login attempt for email: dquangminh79@gmail.com
+[03-Nov-2025 13:13:00 Europe/Berlin] Login failed: Wrong password - dquangminh79@gmail.com
+[03-Nov-2025 13:13:08 Europe/Berlin] Login request body: {"email":"dquangminh79@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:13:08 Europe/Berlin] Login attempt for email: dquangminh79@gmail.com
+[03-Nov-2025 13:13:08 Europe/Berlin] Login successful: dquangminh79@gmail.com
+[03-Nov-2025 13:13:34 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:13:34 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:13:34 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 13:13:52 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:13:52 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:13:52 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 13:14:24 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:14:24 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:14:25 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 13:40:30 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:40:30 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:40:30 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 13:41:19 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:41:19 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:41:19 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 13:42:56 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 13:42:56 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 13:42:56 Europe/Berlin] Login successful: dinh48967@gmail.com
+[03-Nov-2025 17:54:38 Europe/Berlin] Login request body: {"email":"dquangminh79@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 17:54:38 Europe/Berlin] Login attempt for email: dquangminh79@gmail.com
+[03-Nov-2025 17:54:38 Europe/Berlin] Login successful: dquangminh79@gmail.com
+[03-Nov-2025 17:56:40 Europe/Berlin] Login request body: {"email":"dinh48967@gmail.com","id":0,"password":"minhteo2003"}
+[03-Nov-2025 17:56:40 Europe/Berlin] Login attempt for email: dinh48967@gmail.com
+[03-Nov-2025 17:56:41 Europe/Berlin] Login successful: dinh48967@gmail.com
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Script started
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Database config loaded
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Database connected successfully
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Raw input length: 63
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Data from POST
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Received - Email: dinh48967@gmail.com, OTP: 364979
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Input validation passed
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Preparing OTP check query
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Executing OTP check query
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] OTP check result: 1 row(s)
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Valid OTP for user ID: 2 (nguyen van a)
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Password hashed successfully
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Preparing password update query
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Executing password update
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Password updated successfully. Affected rows: 1
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Database connection closed
+[04-Nov-2025 06:51:11 Europe/Berlin] [RESET_PASSWORD] Sending success response
